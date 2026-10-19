@@ -1,3 +1,4 @@
+
 name: AI Testing Agent CI
 
 on:
@@ -27,5 +28,32 @@ jobs:
       - name: Install Playwright Chromium
         run: python -m playwright install --with-deps chromium
 
-      - name: Run unit tests
+      - name: Install Ollama
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sh
+
+      - name: Start Ollama
+        run: |
+          sudo systemctl start ollama || true
+
+          if ! curl --silent --fail http://localhost:11434/api/tags; then
+            nohup ollama serve > /tmp/ollama.log 2>&1 &
+          fi
+
+          for i in $(seq 1 60); do
+            if curl --silent --fail http://localhost:11434/api/tags; then
+              echo "Ollama is ready"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "Ollama failed to start"
+          cat /tmp/ollama.log || true
+          exit 1
+
+      - name: Pull Ollama model
+        run: ollama pull qwen2.5:3b
+
+      - name: Run unit and integration tests
         run: python -m pytest -v
